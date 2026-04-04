@@ -1,0 +1,5 @@
+flask>=3.0
+gunicorn
+requests
+python-dotenv
+apscheduler

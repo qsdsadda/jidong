@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#2DC76D">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="即动">
+  <link rel="manifest" href="/static/manifest.json">
+  <title>{% block title %}即动 - 职场运动伴侣{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css?v=20260404">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+<div class="app-wrap">
+
+  <!-- Header -->
+  <header class="app-header">
+    <!-- 返回按钮（非首页时显示）-->
+    <button class="header-back" id="headerBack" onclick="history.back()" style="display:none;">
+      &#8592;
+    </button>
+    <span class="logo" id="headerLogo">即动</span>
+    <div class="header-right">
+      <span class="slogan">职场运动伴侣</span>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="page-content">
+    {% block content %}{% endblock %}
+  </main>
+
+</div>
+
+<!-- 底部导航 -->
+<nav class="bottom-nav" id="bottomNav">
+  <a href="#" class="nav-item" id="nav-home">
+    <div class="nav-icon">🏠</div>
+    <div class="nav-label">首页</div>
+  </a>
+  <a href="#" class="nav-item" id="nav-rx">
+    <div class="nav-icon">📋</div>
+    <div class="nav-label">处方</div>
+  </a>
+  <a href="#" class="nav-item" id="nav-checkin">
+    <div class="nav-icon">✅</div>
+    <div class="nav-label">打卡</div>
+  </a>
+  <a href="#" class="nav-item" id="nav-wellness">
+    <div class="nav-icon">🧘</div>
+    <div class="nav-label">健康</div>
+  </a>
+  <a href="#" class="nav-item" id="nav-report">
+    <div class="nav-icon">📊</div>
+    <div class="nav-label">周报</div>
+  </a>
+</nav>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loadingText">AI 正在生成专属处方...</div>
+  <div class="loading-sub" id="loadingSub">基于 FITT 原则 · 运动科学算法</div>
+</div>
+
+<!-- 护眼提醒 Toast -->
+<div class="eye-toast" id="eyeToast">
+  <div class="eye-toast-icon">👁️</div>
+  <div class="eye-toast-text">
+    <h4>20-20-20 护眼提醒</h4>
+    <p>盯屏幕已 20 分钟，看远处 20 秒放松眼睛</p>
+  </div>
+  <button class="eye-toast-close" onclick="dismissEyeToast()">✕</button>
+</div>
+
+<!-- 久坐警告弹窗 -->
+<div class="sit-alert" id="sitAlert">
+  <div class="sit-alert-box">
+    <div class="sit-alert-icon">🚨</div>
+    <div class="sit-alert-title">久坐警报！</div>
+    <div class="sit-alert-sub">你已连续久坐超过 45 分钟<br>站起来活动 2-3 分钟，对脊柱很重要！</div>
+    <button class="sit-alert-btn" onclick="resetSedentaryTimer()">
+      ✅ 我已起身活动了！
+    </button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// 核心工具
+// ══════════════════════════════════════════
+const JD = {
+  getUserId() { return localStorage.getItem('jidong_user_id'); },
+  setUserId(id) { localStorage.setItem('jidong_user_id', id); },
+
+  showLoading(text, sub) {
+    document.getElementById('loadingText').textContent = text || 'AI 正在生成专属处方...';
+    document.getElementById('loadingSub').textContent = sub || '基于 FITT 原则 · 运动科学算法';
+    document.getElementById('loadingOverlay').classList.add('active');
+  },
+  hideLoading() {
+    document.getElementById('loadingOverlay').classList.remove('active');
+  },
+};
+
+// ══════════════════════════════════════════
+// 底部导航初始化
+// ══════════════════════════════════════════
+function initBottomNav() {
+  const uid = JD.getUserId();
+  const nav = document.getElementById('bottomNav');
+  if (!nav) return;
+
+  if (uid) {
+    document.getElementById('nav-home').href     = '/home/' + uid;
+    document.getElementById('nav-rx').href       = '/prescription/' + uid;
+    document.getElementById('nav-checkin').href  = '/checkin/' + uid;
+    document.getElementById('nav-wellness').href = '/wellness/' + uid;
+    document.getElementById('nav-report').href   = '/report/' + uid;
+  } else {
+    nav.style.display = 'none';
+    document.querySelector('.app-wrap').style.paddingBottom = '0';
+  }
+
+  const path = location.pathname;
+  if (path.includes('/home/'))              document.getElementById('nav-home').classList.add('active');
+  else if (path.includes('/prescription/')) document.getElementById('nav-rx').classList.add('active');
+  else if (path.includes('/checkin/'))      document.getElementById('nav-checkin').classList.add('active');
+  else if (path.includes('/wellness/'))     document.getElementById('nav-wellness').classList.add('active');
+  else if (path.includes('/report/'))       document.getElementById('nav-report').classList.add('active');
+}
+
+// ══════════════════════════════════════════
+// 久坐计时器（全局）
+// ══════════════════════════════════════════
+const SEDENTARY_LIMIT = 45 * 60; // 45分钟
+const EYE_INTERVAL   = 20 * 60; // 20分钟
+
+const SIT = {
+  getStart() {
+    const v = localStorage.getItem('jd_sit_start');
+    return v ? parseInt(v) : Date.now();
+  },
+  reset() {
+    localStorage.setItem('jd_sit_start', Date.now());
+    localStorage.setItem('jd_eye_last', Date.now());
+    document.getElementById('sitAlert').classList.remove('show');
+    updateTimerWidgets();
+  },
+  getElapsed() {
+    return Math.floor((Date.now() - this.getStart()) / 1000);
+  },
+  getEyeElapsed() {
+    const last = parseInt(localStorage.getItem('jd_eye_last') || Date.now());
+    return Math.floor((Date.now() - last) / 1000);
+  },
+  resetEye() {
+    localStorage.setItem('jd_eye_last', Date.now());
+  }
+};
+
+// 初始化 start time（首次）
+if (!localStorage.getItem('jd_sit_start')) SIT.reset();
+
+let alertShown = false;
+
+function updateTimerWidgets() {
+  const elapsed = SIT.getElapsed();
+  const remaining = Math.max(SEDENTARY_LIMIT - elapsed, 0);
+  const pct = Math.min(elapsed / SEDENTARY_LIMIT * 100, 100);
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+
+  // 更新首页计时卡（如果存在）
+  const timerNum  = document.getElementById('timerNumber');
+  const timerBar  = document.getElementById('timerBar');
+  const timerSub  = document.getElementById('timerSub');
+
+  if (timerNum) {
+    timerNum.textContent = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+    timerNum.className = 'timer-number ' + (elapsed >= SEDENTARY_LIMIT ? 'warn' : 'ok');
+  }
+  if (timerBar) {
+    timerBar.style.width = pct + '%';
+    timerBar.className = 'timer-bar ' + (elapsed >= SEDENTARY_LIMIT ? 'warn' : '');
+  }
+  if (timerSub) {
+    timerSub.textContent = elapsed >= SEDENTARY_LIMIT
+      ? '⚠️ 已超出建议久坐时长！'
+      : `距下次提醒还有 ${Math.floor(remaining/60)} 分钟`;
+  }
+
+  // 久坐警告
+  if (elapsed >= SEDENTARY_LIMIT && !alertShown) {
+    alertShown = true;
+    document.getElementById('sitAlert').classList.add('show');
+    // 震动提醒
+    if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+  }
+  if (elapsed < SEDENTARY_LIMIT) alertShown = false;
+
+  // 护眼提醒
+  const eyeElapsed = SIT.getEyeElapsed();
+  if (eyeElapsed >= EYE_INTERVAL) {
+    showEyeToast();
+    SIT.resetEye();
+  }
+}
+
+function resetSedentaryTimer() {
+  SIT.reset();
+  alertShown = false;
+}
+
+// 护眼 Toast
+let eyeToastTimer = null;
+function showEyeToast() {
+  const toast = document.getElementById('eyeToast');
+  if (!toast) return;
+  toast.classList.add('show');
+  clearTimeout(eyeToastTimer);
+  eyeToastTimer = setTimeout(() => toast.classList.remove('show'), 12000);
+}
+function dismissEyeToast() {
+  document.getElementById('eyeToast').classList.remove('show');
+  clearTimeout(eyeToastTimer);
+}
+
+// 每秒更新
+setInterval(updateTimerWidgets, 1000);
+updateTimerWidgets();
+
+// ══════════════════════════════════════════
+// PWA
+// ══════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+  });
+}
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const banner = document.getElementById('installBanner');
+  if (banner) banner.classList.add('show');
+});
+function triggerInstall() {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+    const banner = document.getElementById('installBanner');
+    if (banner) banner.classList.remove('show');
+  }
+}
+
+// 初始化
+window.addEventListener('DOMContentLoaded', () => {
+  initBottomNav();
+  initHeaderBack();
+});
+
+function initHeaderBack() {
+  const path = location.pathname;
+  const isHome = path === '/' || path.includes('/home/');
+  const backBtn = document.getElementById('headerBack');
+  const logo = document.getElementById('headerLogo');
+  if (!isHome && backBtn) {
+    backBtn.style.display = 'flex';
+    // 缩小 logo 给返回按钮让位
+    if (logo) logo.style.fontSize = '18px';
+  }
+}
+</script>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

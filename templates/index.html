@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}即动 - 首页{% endblock %}
+{% block content %}
+
+<!-- PWA 安装横幅 -->
+<div class="install-banner" id="installBanner">
+  <span>📱 添加到桌面，随时打卡</span>
+  <button class="install-btn-small" onclick="triggerInstall()">立即添加</button>
+</div>
+
+<!-- Hero 卡片：问候 + 核心数据 -->
+<div class="hero-card">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+    <div>
+      <div class="hero-greeting">{{ greeting }}</div>
+      <div class="hero-date">
+        {{ now_date }}
+        {% if today_checkin %}
+          &nbsp;·&nbsp;<span style="background:rgba(255,255,255,0.25);border-radius:99px;padding:2px 10px;font-size:11px;">今日已打卡 ✓</span>
+        {% else %}
+          &nbsp;·&nbsp;<span style="background:rgba(255,255,255,0.15);border-radius:99px;padding:2px 10px;font-size:11px;">今日待打卡</span>
+        {% endif %}
+      </div>
+    </div>
+    {% if bmi %}
+    <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:8px 12px;text-align:center;flex-shrink:0;">
+      <div style="font-size:18px;font-weight:900;">{{ bmi }}</div>
+      <div style="font-size:10px;opacity:0.85;">BMI·{{ bmi_cat }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- 三格统计 -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+    <div style="background:rgba(255,255,255,0.15);border-radius:12px;padding:10px 6px;text-align:center;">
+      <div style="font-size:24px;font-weight:900;line-height:1;">{{ stats.streak }}</div>
+      <div style="font-size:10px;opacity:0.8;margin-top:3px;">连续天数</div>
+    </div>
+    <div style="background:rgba(255,255,255,0.15);border-radius:12px;padding:10px 6px;text-align:center;">
+      <div style="font-size:24px;font-weight:900;line-height:1;">{{ stats.week_rate }}%</div>
+      <div style="font-size:10px;opacity:0.8;margin-top:3px;">本周完成</div>
+    </div>
+    <div style="background:rgba(255,255,255,0.15);border-radius:12px;padding:10px 6px;text-align:center;">
+      <div style="font-size:24px;font-weight:900;line-height:1;">{{ stats.week_days }}</div>
+      <div style="font-size:10px;opacity:0.8;margin-top:3px;">本周天数</div>
+    </div>
+  </div>
+
+  <!-- 21天进度 -->
+  <div style="margin-top:12px;">
+    <div style="display:flex;justify-content:space-between;font-size:10px;opacity:0.75;margin-bottom:5px;">
+      <span>21天习惯养成进度</span>
+      <span>{{ stats.streak }}/21天</span>
+    </div>
+    <div style="background:rgba(255,255,255,0.2);border-radius:99px;height:6px;overflow:hidden;">
+      <div style="height:100%;background:#fff;border-radius:99px;width:{{ [stats.streak/21*100,100]|min }}%;transition:width 0.8s;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 久坐计时器 -->
+<div class="timer-card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+    <div>
+      <div style="font-size:13px;font-weight:700;color:#fff;">⏱ 久坐计时</div>
+      <div style="font-size:10px;opacity:0.55;margin-top:1px;">每45分钟起身活动2分钟</div>
+    </div>
+    <div style="font-size:10px;background:rgba(255,107,53,0.25);color:#FF8C5A;padding:3px 8px;border-radius:99px;font-weight:700;">ACSM建议</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <div style="font-size:38px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1;" id="timerNumber" class="timer-number ok">00:00</div>
+    <div style="flex:1;">
+      <div class="timer-bar-wrap"><div class="timer-bar" id="timerBar" style="width:0%;"></div></div>
+      <div style="font-size:11px;opacity:0.6;margin-top:5px;" id="timerSub">正在计时...</div>
+    </div>
+  </div>
+  <button class="timer-reset-btn" style="margin-top:10px;" onclick="resetSedentaryTimer()">✅ 已起身活动，重新计时</button>
+</div>
+
+<!-- 快捷操作 2×2 -->
+<div class="quick-grid">
+  {% if today_checkin %}
+  <div class="quick-card accent-green" style="grid-column:span 2;flex-direction:row;align-items:center;gap:14px;background:var(--green-light);">
+    <div style="font-size:28px;">✅</div>
+    <div>
+      <div class="quick-card-label" style="color:var(--green-dark);">今日打卡已完成</div>
+      <div class="quick-card-sub">完成率 {{ (today_checkin.completion_rate*100)|int }}% · 继续保持！</div>
+    </div>
+  </div>
+  {% else %}
+  <a href="/checkin/{{ user_id }}" class="quick-card accent-green" style="grid-column:span 2;flex-direction:row;align-items:center;gap:14px;">
+    <div style="font-size:28px;">💪</div>
+    <div>
+      <div class="quick-card-label">开始今日打卡</div>
+      <div class="quick-card-sub">{% if active_rx %}{{ active_rx.prescription.prescription_name }}{% else %}完成今日运动计划{% endif %}</div>
+    </div>
+    <div style="margin-left:auto;font-size:20px;color:var(--green);">→</div>
+  </a>
+  {% endif %}
+
+  <a href="/symptom/{{ user_id }}" class="quick-card accent-orange">
+    <div class="quick-card-icon">😣</div>
+    <div class="quick-card-label">今日不适</div>
+    <div class="quick-card-sub">对症快速处方</div>
+  </a>
+  <a href="/prescription/{{ user_id }}" class="quick-card accent-blue">
+    <div class="quick-card-icon">📋</div>
+    <div class="quick-card-label">我的处方</div>
+    <div class="quick-card-sub">查看运动计划</div>
+  </a>
+  <a href="/wellness/{{ user_id }}" class="quick-card" style="border-left:4px solid #9B59B6;">
+    <div class="quick-card-icon">🧘</div>
+    <div class="quick-card-label">正念呼吸</div>
+    <div class="quick-card-sub">1分钟减压</div>
+  </a>
+  <a href="/report/{{ user_id }}" class="quick-card" style="border-left:4px solid var(--yellow);">
+    <div class="quick-card-icon">📊</div>
+    <div class="quick-card-label">周报分析</div>
+    <div class="quick-card-sub">数据·AI点评</div>
+  </a>
+</div>
+
+<!-- 科学说明 -->
+<div style="background:var(--green-light);border-radius:14px;padding:12px 14px;margin-top:4px;">
+  <div style="font-size:11px;color:var(--green-dark);font-weight:700;margin-bottom:4px;">📐 科学依据</div>
+  <div style="font-size:11px;color:var(--green-dark);line-height:1.7;opacity:0.9;">
+    处方基于 <strong>FITT-VP 原则</strong> 与 <strong>ACSM 2026</strong> 久坐人群指南，采用 <strong>MET 代谢当量</strong> 量化强度，碎片化设计符合 BMC Public Health 最新研究。
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>JD.setUserId("{{ user_id }}");</script>
+{% endblock %}

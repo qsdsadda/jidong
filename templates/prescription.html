@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}即动 - 我的处方{% endblock %}
+
+{% block content %}
+{% set p = rx.prescription %}
+
+<!-- 处方标题区 -->
+<div class="version-card">
+  <span>📋</span>
+  <span>第 {{ rx.version }} 版 · {{ rx.trigger_type | replace('initial','初始生成') | replace('upgrade','难度升级') | replace('downgrade','难度降低') | replace('symptom','症状处方') }}</span>
+  <button onclick="regeneratePrescription()" style="margin-left:auto;background:var(--green-light);color:var(--green-dark);border:none;border-radius:99px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;">
+    🔄 重新生成
+  </button>
+</div>
+
+<div style="margin-bottom:16px;">
+  <h1 style="font-size:20px;font-weight:900;line-height:1.3;margin-bottom:8px;">{{ p.prescription_name }}</h1>
+  <p style="font-size:13px;color:var(--text-mid);line-height:1.7;background:#F7FAF8;border-radius:12px;padding:12px;">
+    💡 {{ p.user_summary }}
+  </p>
+</div>
+
+<!-- 处方标签 -->
+<div style="margin-bottom:6px;">
+  <span class="pill pill-green">⚡ {{ p.difficulty }}</span>
+  <span class="pill pill-gray">⏱ {{ p.total_minutes }}分钟/次</span>
+  <span class="pill pill-blue">🎯 {{ p.weekly_goal }}</span>
+  {% if p.fitt_summary %}
+  <span class="pill pill-yellow">📐 {{ p.fitt_summary }}</span>
+  {% endif %}
+</div>
+
+<!-- 总卡路里估算 -->
+{% if user.weight %}
+<div style="background:linear-gradient(135deg,#FFF8EC,#FFF0D4);border-radius:14px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;border:1px solid #F5D88A;">
+  <div style="font-size:28px;">🔥</div>
+  <div>
+    <div style="font-size:13px;color:#8A6020;margin-bottom:2px;">每次运动消耗约</div>
+    <div style="font-size:22px;font-weight:900;color:#B7791F;">
+      {{ calories }} <span style="font-size:14px;font-weight:600;">千卡</span>
+    </div>
+  </div>
+  <div style="margin-left:auto;font-size:11px;color:#A07020;text-align:right;line-height:1.5;">
+    基于 MET<br>代谢当量
+  </div>
+</div>
+{% endif %}
+
+<!-- FITT 科学框架 -->
+{% if p.fitt_detail %}
+<div class="card" style="background:#EEF4FF;border:none;margin-bottom:16px;">
+  <div style="font-size:13px;font-weight:800;color:var(--blue);margin-bottom:8px;">📐 FITT 运动处方框架</div>
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+    {% for item in p.fitt_detail %}
+    <div style="background:#fff;border-radius:10px;padding:10px;font-size:12px;">
+      <div style="color:var(--blue);font-weight:700;margin-bottom:3px;">{{ item.key }}</div>
+      <div style="color:var(--text-mid);">{{ item.value }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- 动作列表（按时间段分组）-->
+{% if p.daily_routines %}
+  {% for routine in p.daily_routines %}
+  <div style="margin-bottom:6px;">
+    <div class="time-slot-header">
+      <div class="time-slot-icon">
+        {% if routine.time_slot == '早晨' %}🌅
+        {% elif routine.time_slot == '午休' %}☀️
+        {% elif routine.time_slot == '傍晚' %}🌆
+        {% elif routine.time_slot == '睡前' %}🌙
+        {% else %}⏰{% endif %}
+      </div>
+      <div class="time-slot-label">{{ routine.time_slot }}</div>
+      <div class="time-slot-meta">{{ routine.scene }} · {{ routine.duration_minutes }}分钟</div>
+    </div>
+
+    {% for ex in routine.exercises %}
+    {% set cat_map = {'颈椎':'cat-neck','腰背':'cat-back','核心':'cat-core','眼睛':'cat-eye','肩膀':'cat-shoulder','全身':'cat-full'} %}
+    {% set cat_class = cat_map.get(ex.category, 'cat-full') %}
+    <div class="exercise-card">
+      <div class="exercise-header" onclick="toggleEx(this)">
+        <div class="exercise-category-bar {{ cat_class }}"></div>
+        <div class="exercise-info">
+          <div class="exercise-name">{{ ex.name }}</div>
+          <div class="exercise-meta">
+            <span>{{ ex.duration }} × {{ ex.sets }}组</span>
+            <span class="pill pill-gray" style="font-size:10px;padding:2px 8px;">{{ ex.scene }}</span>
+            <span class="pill {{ 'pill-blue' if ex.category in ['颈椎','眼睛'] else 'pill-green' }}" style="font-size:10px;padding:2px 8px;">{{ ex.category }}</span>
+          </div>
+        </div>
+        <div class="exercise-right">
+          {% if ex.met_value %}
+          <span class="pill pill-yellow" style="font-size:10px;padding:2px 8px;white-space:nowrap;">MET {{ ex.met_value }}</span>
+          {% endif %}
+          <div class="exercise-expand">▼</div>
+        </div>
+      </div>
+      <div class="exercise-detail">
+        <p style="margin-bottom:8px;">{{ ex.description }}</p>
+        {% if ex.muscle_groups %}
+        <div class="science-text">
+          💪 目标肌群：{{ ex.muscle_groups | join('、') if ex.muscle_groups is iterable and ex.muscle_groups is not string else ex.muscle_groups }}
+        </div>
+        {% endif %}
+        {% if ex.scientific_basis %}
+        <div class="science-text" style="margin-top:6px;">
+          📐 科学依据：{{ ex.scientific_basis }}
+        </div>
+        {% endif %}
+        {% if ex.caution %}
+        <div class="caution-text">⚠️ {{ ex.caution }}</div>
+        {% endif %}
+        <!-- Bilibili 搜索链接 -->
+        <a class="video-link"
+           href="https://search.bilibili.com/all?keyword=办公室+{{ ex.name }}+动作演示"
+           target="_blank" rel="noopener">
+          ▶ B站查看演示视频
+        </a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+{% endif %}
+
+<!-- 处方历史 -->
+{% if history and history|length > 1 %}
+<div class="section-title">处方版本历史</div>
+<div class="card">
+  {% for h in history %}
+  <div class="compare-row" style="font-size:13px;">
+    <span class="pill pill-{{ 'green' if h.trigger_type=='upgrade' else ('orange' if h.trigger_type=='downgrade' else 'gray') }}">第{{ h.version }}版</span>
+    <span style="color:var(--text-mid);">{{ h.trigger_type | replace('initial','🌱 初始') | replace('upgrade','⬆️ 升级') | replace('downgrade','⬇️ 降级') | replace('symptom','💊 症状') }}</span>
+    <span style="color:var(--text-sub);">{{ h.created_at[:10] }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div style="font-size:11px;color:var(--text-sub);text-align:center;padding:12px 0 4px;line-height:1.7;">
+  本处方依据 ACSM 久坐办公人群运动指南制定<br>
+  有基础疾病或急性疼痛请在医生指导下运动
+</div>
+
+<!-- 底部占位 -->
+<div style="height:20px;"></div>
+
+<!-- 底部固定按钮 -->
+<div style="position:fixed;bottom:72px;left:50%;transform:translateX(-50%);width:100%;max-width:480px;padding:10px 16px;background:rgba(242,245,243,0.95);backdrop-filter:blur(8px);border-top:1px solid #eee;">
+  <a href="/checkin/{{ user_id }}" class="btn btn-primary" style="margin:0;">💪 开始今日打卡</a>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+JD.setUserId("{{ user_id }}");
+const userId = "{{ user_id }}";
+
+function toggleEx(header) {
+  const detail = header.nextElementSibling;
+  const arrow = header.querySelector('.exercise-expand');
+  const open = detail.classList.toggle('open');
+  arrow.classList.toggle('open', open);
+}
+
+async function regeneratePrescription() {
+  if (!confirm('重新生成处方后，新处方将包含 FITT 框架和 MET 数据。确定吗？')) return;
+  JD.showLoading('AI 正在重新生成处方...', '应用 FITT 原则 · MET 代谢当量 · ACSM 指南');
+  try {
+    const resp = await fetch(`/api/regenerate_prescription/${userId}`, { method: 'POST' });
+    const data = await resp.json();
+    JD.hideLoading();
+    if (data.success) {
+      location.reload();
+    } else {
+      alert('生成失败：' + (data.error || '请重试'));
+    }
+  } catch(e) {
+    JD.hideLoading();
+    alert('网络错误，请重试');
+  }
+}
+</script>
+{% endblock %}

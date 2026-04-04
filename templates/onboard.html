@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block title %}即动 - 建立专属处方{% endblock %}
+
+{% block content %}
+<div style="text-align:center;margin-bottom:24px;">
+  <h1 style="font-size:22px;font-weight:800;">建立你的运动档案</h1>
+  <p style="font-size:13px;color:#888;margin-top:6px;">AI 将根据你的情况生成专属处方</p>
+</div>
+
+<!-- 步骤指示器 -->
+<div class="step-indicator" id="stepIndicator">
+  <div class="step-dot active" id="dot1"></div>
+  <div class="step-dot" id="dot2"></div>
+  <div class="step-dot" id="dot3"></div>
+</div>
+
+<form id="onboardForm">
+
+  <!-- ── Step 1 ── -->
+  <div class="step-panel" id="step1">
+    <div class="card">
+      <div class="card-title">基本信息</div>
+
+      <div class="form-group">
+        <label class="form-label">你的昵称</label>
+        <input type="text" name="nickname" class="form-input" placeholder="怎么称呼你？" maxlength="10" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">年龄段</label>
+        <div class="option-grid col3">
+          {% for a in ["18-25","26-35","36-45","45+"] %}
+          <div class="option-item">
+            <input type="radio" name="age_range" value="{{ a }}" id="age_{{ loop.index }}" required>
+            <label for="age_{{ loop.index }}">{{ a }}</label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">性别</label>
+        <div class="option-grid">
+          <div class="option-item">
+            <input type="radio" name="gender" value="男" id="g_m">
+            <label for="g_m">👨 男</label>
+          </div>
+          <div class="option-item">
+            <input type="radio" name="gender" value="女" id="g_f">
+            <label for="g_f">👩 女</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">身高 (cm)</label>
+          <input type="number" name="height" class="form-input" placeholder="170" min="140" max="220">
+        </div>
+        <div class="form-group">
+          <label class="form-label">体重 (kg)</label>
+          <input type="number" name="weight" class="form-input" placeholder="65" min="35" max="200">
+        </div>
+      </div>
+    </div>
+    <button type="button" class="btn btn-primary" onclick="nextStep(1)">下一步 →</button>
+  </div>
+
+  <!-- ── Step 2 ── -->
+  <div class="step-panel" id="step2" style="display:none;">
+    <div class="card">
+      <div class="card-title">工作与身体状况</div>
+
+      <div class="form-group">
+        <label class="form-label">工作性质</label>
+        <div class="option-grid">
+          {% for w in ["久坐办公室","站立工作","混合"] %}
+          <div class="option-item">
+            <input type="radio" name="work_type" value="{{ w }}" id="wt_{{ loop.index }}">
+            <label for="wt_{{ loop.index }}">{{ w }}</label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">日均久坐时长</label>
+        <div class="option-grid">
+          {% for s in ["4-6小时","6-8小时","8小时以上"] %}
+          <div class="option-item">
+            <input type="radio" name="sitting_hours" value="{{ s }}" id="sh_{{ loop.index }}">
+            <label for="sh_{{ loop.index }}">{{ s }}</label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">身体哪里不舒服？（多选）</label>
+        <div class="option-grid">
+          {% for b in ["颈椎","腰背","膝盖","肩膀","无"] %}
+          <div class="option-item">
+            <input type="checkbox" name="body_issues" value="{{ b }}" id="bi_{{ loop.index }}">
+            <label for="bi_{{ loop.index }}">{{ b }}</label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">目前运动频率</label>
+        <div class="option-grid">
+          {% for e in ["从不","偶尔","每周1-2次","每周3次+"] %}
+          <div class="option-item">
+            <input type="radio" name="exercise_history" value="{{ e }}" id="eh_{{ loop.index }}">
+            <label for="eh_{{ loop.index }}">{{ e }}</label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <button type="button" class="btn btn-outline" onclick="prevStep(2)" style="margin-bottom:8px;">← 上一步</button>
+    <button type="button" class="btn btn-primary" onclick="nextStep(2)">下一步 →</button>
+  </div>
+
+  <!-- ── Step 3 ── -->
+  <div class="step-panel" id="step3" style="display:none;">
+    <div class="card">
+      <div class="card-title">目标与时间安排</div>
+
+      <div class="form-group">
+        <label class="form-label">健康目标（多选）</label>
+        <div class="option-grid">
+          {% for g in ["缓解颈椎腰椎","减重","提升体能","养成习惯"] %}
+          <div class="option-item">
+            <input type="checkbox" name="goals" value="{{ g }}" id="goal_{{ loop.index }}">
+            <label for="goal_{{ loop.index }}">{{ g }}</label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">可以运动的时间段（多选）</label>
+        <div class="option-grid">
+          {% for t in ["早晨","午休","傍晚","睡前"] %}
+          <div class="option-item">
+            <input type="checkbox" name="available_times" value="{{ t }}" id="at_{{ loop.index }}">
+            <label for="at_{{ loop.index }}">{{ t }}</label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">每次可用多长时间</label>
+        <div class="option-grid">
+          {% for tp in ["5分钟内","5-10分钟","10-15分钟"] %}
+          <div class="option-item">
+            <input type="radio" name="time_per_session" value="{{ tp }}" id="tp_{{ loop.index }}">
+            <label for="tp_{{ loop.index }}">{{ tp }}</label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <button type="button" class="btn btn-outline" onclick="prevStep(3)" style="margin-bottom:8px;">← 上一步</button>
+    <button type="button" class="btn btn-primary" id="submitBtn" onclick="submitForm()">
+      🌟 生成我的专属处方
+    </button>
+  </div>
+
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentStep = 1;
+
+function showStep(n) {
+  [1,2,3].forEach(i => {
+    document.getElementById('step'+i).style.display = i===n ? '' : 'none';
+    const dot = document.getElementById('dot'+i);
+    dot.className = 'step-dot' + (i===n ? ' active' : (i<n ? ' done' : ''));
+  });
+  currentStep = n;
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function nextStep(from) {
+  // 简单验证
+  if (from === 1) {
+    const nick = document.querySelector('[name=nickname]').value.trim();
+    const age = document.querySelector('[name=age_range]:checked');
+    if (!nick) { alert('请输入昵称'); return; }
+    if (!age) { alert('请选择年龄段'); return; }
+  }
+  if (from === 2) {
+    const wt = document.querySelector('[name=work_type]:checked');
+    if (!wt) { alert('请选择工作性质'); return; }
+  }
+  showStep(from + 1);
+}
+
+function prevStep(from) { showStep(from - 1); }
+
+async function submitForm() {
+  const goals = [...document.querySelectorAll('[name=goals]:checked')].map(e=>e.value);
+  const times = [...document.querySelectorAll('[name=available_times]:checked')].map(e=>e.value);
+  if (!goals.length) { alert('请至少选择一个健康目标'); return; }
+  if (!times.length) { alert('请至少选择一个可运动时间段'); return; }
+
+  const tp = document.querySelector('[name=time_per_session]:checked');
+  if (!tp) { alert('请选择每次运动时长'); return; }
+
+  JD.showLoading('AI 正在分析你的情况，生成专属处方...');
+
+  const form = document.getElementById('onboardForm');
+  const fd = new FormData(form);
+  // 多选字段 FormData 已自动包含多个值
+
+  try {
+    const resp = await fetch('/onboard', { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (data.user_id) {
+      JD.setUserId(data.user_id);
+      location.href = data.redirect;
+    } else {
+      JD.hideLoading();
+      alert('生成处方失败，请重试：' + (data.error || '未知错误'));
+    }
+  } catch(e) {
+    JD.hideLoading();
+    alert('网络错误，请检查网络后重试');
+  }
+}
+
+// 如果已有 user_id，跳转首页
+const uid = JD.getUserId();
+if (uid) {
+  // 验证是否有效
+  fetch('/api/checkin_stats/' + uid)
+    .then(r => { if (r.ok) location.href = '/home/' + uid; })
+    .catch(() => {});
+}
+</script>
+{% endblock %}

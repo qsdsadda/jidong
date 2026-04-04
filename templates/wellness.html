@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}即动 - 健康工具{% endblock %}
+{% block content %}
+
+<div style="text-align:center;padding:10px 0 20px;">
+  <div style="font-size:17px;font-weight:900;margin-bottom:4px;">健康工具箱</div>
+  <div style="font-size:12px;color:var(--text-sub);">科学微干预，全天候守护</div>
+</div>
+
+<!-- 正念呼吸 -->
+<div class="card" id="breathCard">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+    <div style="font-size:24px;">🧘</div>
+    <div>
+      <div style="font-weight:800;font-size:15px;">正念呼吸</div>
+      <div style="font-size:12px;color:var(--text-sub);">4-6呼吸法 · 降低皮质醇 · 哈佛医学院推荐</div>
+    </div>
+  </div>
+
+  <!-- 呼吸动画圆 -->
+  <div style="display:flex;flex-direction:column;align-items:center;padding:20px 0;">
+    <div id="breathCircle" style="
+      width:120px;height:120px;border-radius:50%;
+      background:linear-gradient(135deg,#2DC76D,#1A9B53);
+      display:flex;align-items:center;justify-content:center;
+      transition:transform 4s ease-in-out;
+      box-shadow:0 0 0 0 rgba(45,199,109,0.4);
+    ">
+      <div style="color:#fff;font-size:14px;font-weight:700;text-align:center;line-height:1.4;" id="breathLabel">点击开始</div>
+    </div>
+    <div style="margin-top:16px;font-size:13px;color:var(--text-sub);" id="breathPhase">吸气4秒 → 呼气6秒</div>
+    <div style="margin-top:6px;font-size:22px;font-weight:900;color:var(--green-dark);" id="breathCount">0</div>
+    <div style="font-size:11px;color:var(--text-sub);">/ 5 次循环</div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <button class="btn btn-primary" style="margin:0;" onclick="startBreath()">▶ 开始</button>
+    <button class="btn btn-outline" style="margin:0;" onclick="stopBreath()">■ 停止</button>
+  </div>
+  <div style="font-size:11px;color:var(--text-sub);text-align:center;margin-top:10px;line-height:1.6;">
+    研究证明：每天5分钟4-6呼吸法可显著降低压力激素皮质醇，改善专注力
+  </div>
+</div>
+
+<!-- 饮水提醒 -->
+<div class="card">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+    <div style="font-size:24px;">💧</div>
+    <div>
+      <div style="font-weight:800;font-size:15px;">饮水记录</div>
+      <div style="font-size:12px;color:var(--text-sub);">每日目标 8 杯水（约 2000ml）</div>
+    </div>
+  </div>
+  <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;" id="waterCups">
+  </div>
+  <div style="text-align:center;margin-bottom:14px;">
+    <span style="font-size:28px;font-weight:900;color:var(--blue);" id="waterCount">0</span>
+    <span style="font-size:14px;color:var(--text-sub);"> / 8 杯</span>
+  </div>
+  <div class="progress-wrap" style="margin-bottom:14px;">
+    <div class="progress-bar" id="waterBar" style="width:0%;background:linear-gradient(90deg,#4A90E2,#2DC76D);"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <button class="btn btn-ghost" style="margin:0;background:#EEF4FF;color:var(--blue);" onclick="addWater()">+ 喝了一杯</button>
+    <button class="btn btn-ghost" style="margin:0;" onclick="resetWater()">重置</button>
+  </div>
+  <div style="font-size:11px;color:var(--text-sub);text-align:center;margin-top:10px;">
+    脱水5%会导致认知能力下降30%，运动时需额外补水
+  </div>
+</div>
+
+<!-- 20-20-20 护眼 -->
+<div class="card">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+    <div style="font-size:24px;">👁️</div>
+    <div>
+      <div style="font-weight:800;font-size:15px;">20-20-20 护眼法</div>
+      <div style="font-size:12px;color:var(--text-sub);">美国眼科学会推荐 · 预防视疲劳</div>
+    </div>
+  </div>
+  <div style="background:#F8F0FF;border-radius:12px;padding:14px;margin-bottom:14px;">
+    <div style="font-size:13px;color:#6B46C1;line-height:1.8;">
+      每 <strong>20分钟</strong> 停止看屏幕<br>
+      望向 <strong>20英尺（6米）</strong> 外的物体<br>
+      保持 <strong>20秒</strong> 让睫状肌完全放松
+    </div>
+  </div>
+  <div style="text-align:center;margin-bottom:12px;">
+    <div style="font-size:36px;font-weight:900;color:#6B46C1;font-variant-numeric:tabular-nums;" id="eyeCountdown">20:00</div>
+    <div style="font-size:12px;color:var(--text-sub);margin-top:4px;">距下次护眼提醒</div>
+  </div>
+  <button class="btn" style="background:linear-gradient(135deg,#9B59B6,#6B46C1);color:#fff;margin:0;" onclick="triggerEyeNow()">立即护眼 20 秒</button>
+</div>
+
+<!-- 姿势自查 -->
+<div class="card">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+    <div style="font-size:24px;">🪑</div>
+    <div>
+      <div style="font-weight:800;font-size:15px;">坐姿自查</div>
+      <div style="font-size:12px;color:var(--text-sub);">久坐体态问题早发现早纠正</div>
+    </div>
+  </div>
+  <div id="postureChecklist">
+    {% for item in [
+      ('shoulders','双肩放松，不耸肩'),
+      ('back','腰背挺直，靠椅背'),
+      ('screen','屏幕与眼睛平齐'),
+      ('feet','双脚平放地面'),
+      ('wrist','手腕保持中立位'),
+    ] %}
+    <div class="posture-item" id="posture_{{ item[0] }}" onclick="togglePosture('{{ item[0] }}')">
+      <div class="posture-check" id="pcheck_{{ item[0] }}"></div>
+      <div style="font-size:14px;">{{ item[1] }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div style="font-size:12px;color:var(--text-sub);text-align:center;margin-top:10px;" id="postureScore">
+    已检查 0/5 项
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+JD.setUserId("{{ user_id }}");
+const userId = "{{ user_id }}";
+
+// ── 正念呼吸 ──
+let breathTimer = null, breathCycle = 0, breathPhaseIn = true;
+function startBreath() {
+  stopBreath();
+  breathCycle = 0;
+  breathPhaseIn = true;
+  runBreathPhase();
+}
+function runBreathPhase() {
+  const circle = document.getElementById('breathCircle');
+  const label = document.getElementById('breathLabel');
+  const phase = document.getElementById('breathPhase');
+  const count = document.getElementById('breathCount');
+  if (breathCycle >= 5) {
+    label.textContent = '完成！';
+    phase.textContent = '很好，感受一下平静';
+    circle.style.transform = 'scale(1)';
+    return;
+  }
+  if (breathPhaseIn) {
+    label.textContent = '吸气\n4秒';
+    phase.textContent = '缓慢深吸气...';
+    circle.style.transform = 'scale(1.35)';
+    circle.style.transition = 'transform 4s ease-in-out';
+    breathTimer = setTimeout(() => { breathPhaseIn = false; runBreathPhase(); }, 4000);
+  } else {
+    label.textContent = '呼气\n6秒';
+    phase.textContent = '缓慢呼气...';
+    circle.style.transform = 'scale(1)';
+    circle.style.transition = 'transform 6s ease-in-out';
+    breathCycle++;
+    count.textContent = breathCycle;
+    breathTimer = setTimeout(() => { breathPhaseIn = true; runBreathPhase(); }, 6000);
+  }
+}
+function stopBreath() {
+  clearTimeout(breathTimer);
+  const circle = document.getElementById('breathCircle');
+  circle.style.transform = 'scale(1)';
+  document.getElementById('breathLabel').textContent = '点击开始';
+  document.getElementById('breathPhase').textContent = '吸气4秒 → 呼气6秒';
+}
+
+// ── 饮水记录 ──
+function getWater() { return parseInt(localStorage.getItem('jd_water_' + new Date().toDateString()) || 0); }
+function setWater(n) { localStorage.setItem('jd_water_' + new Date().toDateString(), n); }
+function renderWater() {
+  const n = getWater();
+  document.getElementById('waterCount').textContent = n;
+  document.getElementById('waterBar').style.width = Math.min(n/8*100,100) + '%';
+  const cups = document.getElementById('waterCups');
+  cups.innerHTML = '';
+  for (let i = 0; i < 8; i++) {
+    const d = document.createElement('div');
+    d.textContent = '💧';
+    d.style.cssText = `font-size:22px;opacity:${i < n ? 1 : 0.2};transition:opacity 0.3s;cursor:pointer;`;
+    d.onclick = () => { setWater(i+1); renderWater(); };
+    cups.appendChild(d);
+  }
+}
+function addWater() { const n = Math.min(getWater()+1, 8); setWater(n); renderWater(); }
+function resetWater() { setWater(0); renderWater(); }
+renderWater();
+
+// ── 护眼倒计时 ──
+function updateEyeCountdown() {
+  const elapsed = SIT.getEyeElapsed();
+  const remaining = Math.max(20*60 - elapsed, 0);
+  const m = Math.floor(remaining/60), s = remaining%60;
+  const el = document.getElementById('eyeCountdown');
+  if (el) el.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+setInterval(updateEyeCountdown, 1000);
+updateEyeCountdown();
+
+function triggerEyeNow() {
+  showEyeToast();
+  SIT.resetEye();
+}
+
+// ── 坐姿自查 ──
+const postureState = {};
+function togglePosture(key) {
+  postureState[key] = !postureState[key];
+  const check = document.getElementById('pcheck_' + key);
+  const item = document.getElementById('posture_' + key);
+  check.innerHTML = postureState[key] ? '✓' : '';
+  check.classList.toggle('checked', postureState[key]);
+  item.style.background = postureState[key] ? 'var(--green-light)' : '';
+  const done = Object.values(postureState).filter(Boolean).length;
+  document.getElementById('postureScore').textContent = `已检查 ${done}/5 项${done===5?' 🎉 姿势完美！':''}`;
+}
+</script>
+{% endblock %}

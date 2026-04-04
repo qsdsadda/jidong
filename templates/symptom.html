@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}即动 - 症状快速处方{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:20px;">
+  <h1 style="font-size:20px;font-weight:800;">今天哪里不舒服？</h1>
+  <p style="font-size:13px;color:#888;margin-top:6px;">选择症状，AI 为你生成 5-10 分钟专项处方</p>
+</div>
+
+<!-- 症状选择 -->
+<div class="symptom-grid" id="symptomGrid">
+  <div class="symptom-card" onclick="selectSymptom('颈椎酸痛', this)">
+    <div class="symptom-emoji">😣</div>
+    <div class="symptom-info">
+      <h3>颈椎酸痛</h3>
+      <p>长时间低头，颈部酸胀</p>
+    </div>
+  </div>
+  <div class="symptom-card" onclick="selectSymptom('腰背僵硬', this)">
+    <div class="symptom-emoji">😰</div>
+    <div class="symptom-info">
+      <h3>腰背僵硬</h3>
+      <p>久坐后腰部沉重不适</p>
+    </div>
+  </div>
+  <div class="symptom-card" onclick="selectSymptom('肩膀紧张', this)">
+    <div class="symptom-emoji">😤</div>
+    <div class="symptom-info">
+      <h3>肩膀紧张</h3>
+      <p>肩部耸肩、肌肉紧绷</p>
+    </div>
+  </div>
+  <div class="symptom-card" onclick="selectSymptom('眼睛疲劳', this)">
+    <div class="symptom-emoji">👀</div>
+    <div class="symptom-info">
+      <h3>眼睛疲劳</h3>
+      <p>眼睛干涩、视力模糊</p>
+    </div>
+  </div>
+  <div class="symptom-card" onclick="selectSymptom('整体疲惫', this)">
+    <div class="symptom-emoji">😴</div>
+    <div class="symptom-info">
+      <h3>整体疲惫</h3>
+      <p>全身提不起劲，没有精神</p>
+    </div>
+  </div>
+</div>
+
+<!-- 生成按钮（选中后出现）-->
+<div id="genBtnWrap" style="display:none;margin-top:16px;">
+  <button class="btn btn-orange" onclick="generateSymptomPrescription()">
+    ⚡ 生成专项处方
+  </button>
+</div>
+
+<!-- 处方结果展示 -->
+<div class="rx-result" id="rxResult">
+  <div class="section-title" id="rxTitle">专项处方</div>
+  <div class="card" id="rxSummaryCard">
+    <div id="rxName" style="font-size:17px;font-weight:800;margin-bottom:6px;"></div>
+    <div id="rxSummary" style="font-size:13px;color:#555;line-height:1.6;"></div>
+    <div style="margin-top:10px;">
+      <span class="pill pill-green" id="rxDiff"></span>
+      <span class="pill pill-gray" id="rxMins"></span>
+    </div>
+  </div>
+
+  <div id="rxExercises"></div>
+
+  <a href="/home/{{ user_id }}" class="btn btn-primary" style="margin-top:8px;">返回首页</a>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+JD.setUserId("{{ user_id }}");
+const userId = "{{ user_id }}";
+let selectedSymptom = null;
+
+function selectSymptom(name, el) {
+  selectedSymptom = name;
+  document.querySelectorAll('.symptom-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('genBtnWrap').style.display = '';
+}
+
+async function generateSymptomPrescription() {
+  if (!selectedSymptom) return;
+  JD.showLoading(`正在生成「${selectedSymptom}」专项处方...`);
+
+  try {
+    const resp = await fetch(`/symptom/${userId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symptom: selectedSymptom })
+    });
+    const data = await resp.json();
+    JD.hideLoading();
+
+    if (data.prescription) {
+      renderPrescription(data.prescription, data.calories);
+    } else {
+      alert('生成失败：' + (data.error || '请重试'));
+    }
+  } catch(e) {
+    JD.hideLoading();
+    alert('网络错误，请重试');
+  }
+}
+
+function renderPrescription(p, calories) {
+  document.getElementById('rxName').textContent = p.prescription_name || '专项处方';
+  document.getElementById('rxSummary').textContent = p.user_summary || '';
+  document.getElementById('rxDiff').textContent = '⚡ ' + (p.difficulty || '初级');
+  document.getElementById('rxMins').textContent = '⏱ ' + (p.total_minutes || 5) + '分钟';
+  if (calories) {
+    const chip = document.createElement('span');
+    chip.className = 'calorie-chip';
+    chip.textContent = '🔥 约 ' + calories + ' 千卡';
+    document.getElementById('rxSummaryCard').appendChild(chip);
+  }
+  document.getElementById('rxTitle').textContent = `「${selectedSymptom}」专项处方`;
+
+  const exWrap = document.getElementById('rxExercises');
+  exWrap.innerHTML = '';
+
+  if (p.daily_routines && p.daily_routines.length) {
+    p.daily_routines.forEach(routine => {
+      if (!routine.exercises) return;
+      routine.exercises.forEach(ex => {
+        exWrap.innerHTML += `
+          <div class="exercise-card">
+            <div class="exercise-header" onclick="toggleExercise(this)">
+              <div>
+                <div class="exercise-name">${ex.name}</div>
+                <div class="exercise-meta">${ex.duration} × ${ex.sets}组 &nbsp;·&nbsp;
+                  <span class="pill pill-gray" style="font-size:11px;padding:2px 8px;">${ex.scene || '工位'}</span>
+                </div>
+              </div>
+              <div class="exercise-expand">▼</div>
+            </div>
+            <div class="exercise-detail">
+              <p>${ex.description || ''}</p>
+              ${ex.caution ? `<div class="caution-text">⚠️ ${ex.caution}</div>` : ''}
+            </div>
+          </div>`;
+      });
+    });
+  }
+
+  // 滚动到结果区
+  const resultEl = document.getElementById('rxResult');
+  resultEl.classList.add('show');
+  setTimeout(() => resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+
+  // 隐藏症状选择区
+  document.getElementById('symptomGrid').style.opacity = '0.4';
+  document.getElementById('genBtnWrap').style.display = 'none';
+}
+
+function toggleExercise(header) {
+  const detail = header.nextElementSibling;
+  const arrow = header.querySelector('.exercise-expand');
+  const isOpen = detail.classList.contains('open');
+  detail.classList.toggle('open', !isOpen);
+  arrow.classList.toggle('open', !isOpen);
+}
+</script>
+{% endblock %}

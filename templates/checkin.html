@@ -1,0 +1,434 @@
+{% extends "base.html" %}
+{% block title %}即动 - 今日打卡{% endblock %}
+
+{% block content %}
+
+{% if today_checkin %}
+{# ── 今日已完成 ── #}
+<div style="text-align:center;padding:40px 10px 20px;">
+  <div style="font-size:72px;line-height:1;margin-bottom:16px;">✅</div>
+  <div style="font-size:22px;font-weight:900;color:var(--green-dark);margin-bottom:6px;">今日已完成打卡</div>
+  <div style="font-size:14px;color:var(--text-sub);margin-bottom:24px;">
+    完成率 {{ (today_checkin.completion_rate * 100)|int }}%
+    &nbsp;·&nbsp;
+    体感 {% for i in range(today_checkin.feeling_score) %}⭐{% endfor %}
+  </div>
+  <div class="card" style="text-align:left;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <span style="font-weight:800;font-size:15px;">🔥 连续打卡 {{ stats.streak }} 天</span>
+      <span style="font-size:12px;color:var(--text-sub);">目标 21 天</span>
+    </div>
+    <div class="progress-wrap" style="height:10px;">
+      <div class="progress-bar" style="width:{{ [stats.streak/21*100,100]|min }}%;"></div>
+    </div>
+    <div style="font-size:12px;color:var(--text-sub);text-align:center;margin-top:8px;">
+      还差 {{ [21-stats.streak,0]|max }} 天达成习惯里程碑 🏆
+    </div>
+  </div>
+  <a href="/home/{{ user_id }}" class="btn btn-primary">返回首页</a>
+  <a href="/report/{{ user_id }}" class="link-text">查看本周报告</a>
+</div>
+
+{% elif rx %}
+{% set p = rx.prescription %}
+
+{# ── 引导式打卡流程 ── #}
+
+{# 收集所有动作 #}
+{% set all_exercises = [] %}
+{% for routine in p.daily_routines %}
+  {% for ex in routine.exercises %}
+    {% set _ = all_exercises.append({'name': ex.name, 'duration': ex.duration, 'sets': ex.sets,
+       'scene': ex.scene, 'description': ex.description, 'caution': ex.caution,
+       'category': ex.category, 'met_value': ex.met_value|default(1.8),
+       'scientific_basis': ex.scientific_basis|default(''),
+       'muscle_groups': ex.muscle_groups|default([]),
+       'time_slot': routine.time_slot}) %}
+  {% endfor %}
+{% endfor %}
+
+{# 顶部进度条 #}
+<div id="workoutHeader" style="margin-bottom:16px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+    <div>
+      <div style="font-size:18px;font-weight:900;">今日运动</div>
+      <div style="font-size:12px;color:var(--text-sub);margin-top:2px;">{{ p.prescription_name }}</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:22px;font-weight:900;color:var(--green-dark);" id="progressFraction">0/{{ all_exercises|length }}</div>
+      <div style="font-size:11px;color:var(--text-sub);">已完成</div>
+    </div>
+  </div>
+  <div class="progress-wrap" style="height:8px;">
+    <div class="progress-bar" id="topProgressBar" style="width:0%;transition:width 0.5s ease;"></div>
+  </div>
+</div>
+
+{# 动作卡片列表（全部显示，可勾选）#}
+<div id="exerciseListWrap">
+{% for ex in all_exercises %}
+<div class="workout-item" id="item_{{ loop.index0 }}" data-idx="{{ loop.index0 }}"
+     data-name="{{ ex.name }}" data-duration="{{ ex.duration }}" data-sets="{{ ex.sets }}"
+     data-met="{{ ex.met_value }}" onclick="toggleItem({{ loop.index0 }})">
+  <div class="workout-item-left">
+    <div class="workout-check" id="check_{{ loop.index0 }}"></div>
+    <div class="workout-cat-bar cat-{{ ex.category|lower|replace('颈椎','neck')|replace('腰背','back')|replace('肩膀','shoulder')|replace('眼睛','eye')|replace('核心','core')|replace('全身','full') }}"></div>
+    <div class="workout-info">
+      <div class="workout-name">{{ ex.name }}</div>
+      <div class="workout-meta">
+        <span>{{ ex.duration }} × {{ ex.sets }}组</span>
+        <span class="pill pill-gray" style="font-size:10px;padding:1px 7px;">{{ ex.scene }}</span>
+        {% if ex.time_slot %}<span style="font-size:10px;color:var(--text-sub);">{{ ex.time_slot }}</span>{% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="workout-item-right">
+    {% if ex.met_value %}<span class="pill pill-yellow" style="font-size:10px;">MET {{ ex.met_value }}</span>{% endif %}
+    <div class="workout-expand-btn" id="expand_{{ loop.index0 }}">▼</div>
+  </div>
+</div>
+{# 展开详情 #}
+<div class="workout-detail" id="detail_{{ loop.index0 }}">
+  <p style="font-size:13px;color:var(--text-mid);line-height:1.7;margin-bottom:8px;">{{ ex.description }}</p>
+  {% if ex.muscle_groups %}
+  <div style="margin-bottom:8px;">
+    <span style="font-size:11px;color:var(--text-sub);font-weight:700;">训练肌群：</span>
+    {% for m in ex.muscle_groups %}<span class="pill pill-blue" style="font-size:10px;">{{ m }}</span>{% endfor %}
+  </div>
+  {% endif %}
+  {% if ex.scientific_basis %}
+  <div class="science-text">📚 {{ ex.scientific_basis }}</div>
+  {% endif %}
+  {% if ex.caution %}
+  <div class="caution-text">⚠️ {{ ex.caution }}</div>
+  {% endif %}
+  <button class="timer-start-btn" onclick="startTimer(event, {{ loop.index0 }}, '{{ ex.duration }}', {{ ex.sets }})">
+    ▶ 开始计时
+  </button>
+</div>
+{% endfor %}
+</div>
+
+{# 分隔线 #}
+<div style="height:1px;background:var(--border);margin:20px 0;"></div>
+
+{# 体感评分 #}
+<div class="card">
+  <div class="card-title">运动体感如何？</div>
+  <div class="feeling-row">
+    {% for emoji, score, label in [('😩',1,'很差'),('😐',2,'一般'),('😊',3,'还好'),('😄',4,'不错'),('🤩',5,'超棒')] %}
+    <button type="button" class="feeling-btn" onclick="setFeeling({{ score }}, this)" title="{{ label }}">{{ emoji }}</button>
+    {% endfor %}
+  </div>
+  <input type="hidden" id="feelingScore" value="3">
+  <div style="font-size:11px;color:var(--text-sub);text-align:center;margin-top:4px;" id="feelingLabel">还好 😊</div>
+</div>
+
+{# 工作压力 #}
+<div class="card">
+  <div class="card-title">今日工作压力</div>
+  <div class="mood-row">
+    <button type="button" class="mood-btn" onclick="setMood(1,this)">🌤<br>轻松</button>
+    <button type="button" class="mood-btn selected" onclick="setMood(2,this)">⛅<br>一般</button>
+    <button type="button" class="mood-btn" onclick="setMood(3,this)">🌩<br>很累</button>
+  </div>
+  <input type="hidden" id="moodScore" value="2">
+</div>
+
+{# 备注 #}
+<div class="card">
+  <div class="card-title">今日感受（可选）</div>
+  <textarea id="noteInput" class="form-input" placeholder="说说今天运动后的感受..." rows="2" style="resize:none;height:68px;"></textarea>
+</div>
+
+<button class="btn btn-primary" id="submitBtn" onclick="submitCheckin()">完成打卡 💪</button>
+<input type="hidden" id="totalCount" value="{{ all_exercises|length }}">
+
+{% else %}
+<div class="card" style="text-align:center;padding:40px 20px;">
+  <div style="font-size:48px;margin-bottom:14px;">📋</div>
+  <div style="font-size:16px;font-weight:700;margin-bottom:8px;">暂无运动处方</div>
+  <p style="color:var(--text-sub);font-size:13px;margin-bottom:20px;">先完成问卷，AI 为你生成专属处方</p>
+  <a href="/" class="btn btn-primary">去填写问卷</a>
+</div>
+{% endif %}
+
+{# 打卡成功弹层 #}
+<div class="success-wrap" id="successWrap">
+  <div class="success-icon">🎉</div>
+  <div class="success-title">太棒了！</div>
+  <div class="success-sub" id="successSub">打卡成功！</div>
+  <div class="calorie-result" id="calorieResult" style="display:none;">
+    <div class="calorie-result-num" id="calorieNum">0</div>
+    <div class="calorie-result-label">🔥 本次消耗约 X 千卡（基于 MET 代谢当量）</div>
+  </div>
+  <div class="card" style="text-align:left;margin-top:0;">
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+      <span id="streakLabel" style="font-weight:800;">连续打卡 0 天</span>
+      <span style="font-size:12px;color:var(--text-sub);">目标 21 天</span>
+    </div>
+    <div class="progress-wrap" style="height:10px;">
+      <div class="progress-bar" id="streakBar" style="width:0%;"></div>
+    </div>
+  </div>
+  <div id="milestoneBanner" class="milestone-banner" style="display:none;"></div>
+  <a href="/home/{{ user_id }}" class="btn btn-primary" style="margin-top:16px;">返回首页</a>
+  <a href="/report/{{ user_id }}" class="link-text">查看周报</a>
+</div>
+
+{# 计时器弹层 #}
+<div class="sit-alert" id="timerModal">
+  <div class="sit-alert-box">
+    <div style="font-size:13px;color:var(--text-sub);margin-bottom:4px;" id="timerExName">动作名</div>
+    <div style="font-size:14px;font-weight:700;margin-bottom:16px;" id="timerSetInfo">第 1 组 / 共 2 组</div>
+    <div style="font-size:64px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--green-dark);line-height:1;margin-bottom:8px;" id="timerCountdown">30</div>
+    <div style="font-size:13px;color:var(--text-sub);margin-bottom:16px;">秒</div>
+    <div class="progress-wrap" style="height:8px;margin-bottom:20px;">
+      <div class="progress-bar" id="timerBar" style="width:100%;transition:width 1s linear;"></div>
+    </div>
+    <button class="sit-alert-btn" id="timerActionBtn" onclick="timerAction()">暂停</button>
+    <button onclick="skipTimer()" style="background:none;border:none;color:var(--text-sub);font-size:13px;margin-top:12px;cursor:pointer;display:block;width:100%;">跳过此组</button>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+JD.setUserId("{{ user_id }}");
+const userId = "{{ user_id }}";
+const totalCount = parseInt(document.getElementById('totalCount')?.value || 0);
+let checkedItems = new Set();
+
+// ── 勾选动作 ──
+function toggleItem(idx) {
+  const item = document.getElementById('item_' + idx);
+  const check = document.getElementById('check_' + idx);
+  const detail = document.getElementById('detail_' + idx);
+  const expand = document.getElementById('expand_' + idx);
+
+  // 展开/收起详情
+  const isExpanded = detail.classList.contains('open');
+  if (!isExpanded) {
+    detail.classList.add('open');
+    expand.style.transform = 'rotate(180deg)';
+    return; // 第一次点击只展开
+  }
+}
+
+function markDone(idx) {
+  const item = document.getElementById('item_' + idx);
+  const check = document.getElementById('check_' + idx);
+  if (checkedItems.has(idx)) {
+    checkedItems.delete(idx);
+    item.classList.remove('done');
+    check.innerHTML = '';
+    check.classList.remove('checked');
+  } else {
+    checkedItems.add(idx);
+    item.classList.add('done');
+    check.innerHTML = '✓';
+    check.classList.add('checked');
+  }
+  updateTopProgress();
+}
+
+function updateTopProgress() {
+  const bar = document.getElementById('topProgressBar');
+  const frac = document.getElementById('progressFraction');
+  const pct = totalCount > 0 ? checkedItems.size / totalCount * 100 : 0;
+  if (bar) bar.style.width = pct + '%';
+  if (frac) frac.textContent = checkedItems.size + '/' + totalCount;
+}
+
+// ── 计时器 ──
+let timerInterval = null;
+let timerSeconds = 30;
+let timerTotal = 30;
+let timerCurrentSet = 1;
+let timerTotalSets = 1;
+let timerItemIdx = -1;
+let timerPaused = false;
+
+function startTimer(e, idx, duration, sets) {
+  e.stopPropagation();
+  timerItemIdx = idx;
+  timerTotalSets = sets;
+  timerCurrentSet = 1;
+  // 解析时长（如 "30秒" → 30，"1分钟" → 60）
+  const secMatch = duration.match(/(\d+)\s*秒/);
+  const minMatch = duration.match(/(\d+)\s*分钟?/);
+  timerSeconds = secMatch ? parseInt(secMatch[1]) : (minMatch ? parseInt(minMatch[1]) * 60 : 30);
+  timerTotal = timerSeconds;
+  timerPaused = false;
+
+  const name = document.getElementById('item_' + idx)?.querySelector('.workout-name')?.textContent || '';
+  document.getElementById('timerExName').textContent = name;
+  updateTimerDisplay();
+  document.getElementById('timerModal').classList.add('show');
+  runTimer();
+}
+
+function runTimer() {
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    if (timerPaused) return;
+    timerSeconds--;
+    updateTimerDisplay();
+    if (timerSeconds <= 0) {
+      clearInterval(timerInterval);
+      if (timerCurrentSet < timerTotalSets) {
+        // 组间休息
+        const restSecs = timerTotal <= 30 ? 15 : 30; // 短动作15秒，长动作30秒
+        timerCurrentSet++;
+        showRestCountdown(restSecs, () => {
+          timerSeconds = timerTotal;
+          updateTimerDisplay();
+          runTimer();
+        });
+      } else {
+        document.getElementById('timerCountdown').textContent = '✓';
+        document.getElementById('timerSetInfo').textContent = '全部完成！';
+        document.getElementById('timerActionBtn').textContent = '完成';
+        document.getElementById('timerBar').style.width = '100%';
+        markDone(timerItemIdx);
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      }
+    }
+  }, 1000);
+}
+
+let restTimer = null;
+function showRestCountdown(secs, callback) {
+  let remaining = secs;
+  document.getElementById('timerCountdown').textContent = remaining;
+  document.getElementById('timerSetInfo').textContent = `休息 ${secs}秒 → 第 ${timerCurrentSet} 组`;
+  document.getElementById('timerBar').style.background = '#F5A623';
+  document.getElementById('timerActionBtn').textContent = '跳过休息';
+  document.getElementById('timerActionBtn').onclick = () => {
+    clearInterval(restTimer);
+    document.getElementById('timerBar').style.background = '';
+    document.getElementById('timerActionBtn').textContent = '暂停';
+    document.getElementById('timerActionBtn').onclick = timerAction;
+    callback();
+  };
+  restTimer = setInterval(() => {
+    remaining--;
+    document.getElementById('timerCountdown').textContent = remaining;
+    const pct = remaining / secs * 100;
+    document.getElementById('timerBar').style.width = pct + '%';
+    if (remaining <= 0) {
+      clearInterval(restTimer);
+      document.getElementById('timerBar').style.background = '';
+      document.getElementById('timerActionBtn').textContent = '暂停';
+      document.getElementById('timerActionBtn').onclick = timerAction;
+      callback();
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  document.getElementById('timerCountdown').textContent = timerSeconds;
+  document.getElementById('timerSetInfo').textContent = `第 ${timerCurrentSet} 组 / 共 ${timerTotalSets} 组`;
+  const pct = timerTotal > 0 ? timerSeconds / timerTotal * 100 : 0;
+  document.getElementById('timerBar').style.width = pct + '%';
+}
+
+function timerAction() {
+  const btn = document.getElementById('timerActionBtn');
+  if (btn.textContent === '完成') {
+    closeTimer();
+    return;
+  }
+  timerPaused = !timerPaused;
+  btn.textContent = timerPaused ? '继续' : '暂停';
+}
+
+function skipTimer() {
+  clearInterval(timerInterval);
+  markDone(timerItemIdx);
+  closeTimer();
+}
+
+function closeTimer() {
+  clearInterval(timerInterval);
+  document.getElementById('timerModal').classList.remove('show');
+}
+
+// ── 体感 / 压力 ──
+const feelingLabels = ['','很差 😩','一般 😐','还好 😊','不错 😄','超棒 🤩'];
+function setFeeling(score, btn) {
+  document.getElementById('feelingScore').value = score;
+  document.querySelectorAll('.feeling-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById('feelingLabel').textContent = feelingLabels[score] || '';
+}
+function setMood(score, btn) {
+  document.getElementById('moodScore').value = score;
+  document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+document.querySelectorAll('.feeling-btn')[2]?.classList.add('selected');
+
+// ── 提交打卡 ──
+async function submitCheckin() {
+  const btn = document.getElementById('submitBtn');
+  if (btn) btn.disabled = true;
+  JD.showLoading('正在提交打卡...', '记录你的运动数据');
+  const completionRate = totalCount > 0 ? checkedItems.size / totalCount : 0;
+  try {
+    const resp = await fetch(`/checkin/${userId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        completion_rate: completionRate,
+        feeling_score: parseInt(document.getElementById('feelingScore').value),
+        mood_score: parseInt(document.getElementById('moodScore').value),
+        completed_count: checkedItems.size,
+        total_count: totalCount,
+        note: document.getElementById('noteInput')?.value || '',
+      })
+    });
+    const data = await resp.json();
+    JD.hideLoading();
+    if (data.success) {
+      showSuccess(data);
+      resetSedentaryTimer();
+    } else {
+      alert('打卡失败：' + (data.error || '请重试'));
+      if (btn) btn.disabled = false;
+    }
+  } catch(e) {
+    JD.hideLoading();
+    alert('网络错误，请重试');
+    if (btn) btn.disabled = false;
+  }
+}
+
+function showSuccess(data) {
+  document.getElementById('workoutHeader')?.remove();
+  document.getElementById('exerciseListWrap')?.remove();
+  document.querySelectorAll('.card, #submitBtn, hr, [style*="height:1px"]').forEach(el => {
+    if (!el.closest('#successWrap')) el.style.display = 'none';
+  });
+  const wrap = document.getElementById('successWrap');
+  wrap.style.display = 'block';
+  const streak = data.streak || 0;
+  document.getElementById('streakLabel').textContent = `🔥 连续打卡 ${streak} 天`;
+  document.getElementById('streakBar').style.width = Math.min(streak/21*100, 100) + '%';
+  document.getElementById('successSub').textContent = `连续坚持了 ${streak} 天，继续加油！`;
+  if (data.calories) {
+    const cr = document.getElementById('calorieResult');
+    cr.style.display = 'block';
+    document.getElementById('calorieNum').textContent = data.calories;
+    cr.querySelector('.calorie-result-label').textContent = `🔥 本次消耗约 ${data.calories} 千卡（MET代谢当量估算）`;
+  }
+  if (data.milestone) {
+    const banner = document.getElementById('milestoneBanner');
+    banner.textContent = data.milestone.msg;
+    banner.style.display = 'block';
+  }
+  wrap.scrollIntoView({ behavior: 'smooth' });
+}
+</script>
+{% endblock %}
